@@ -451,14 +451,19 @@ app.delete('/api/admin/users/:uid', async (req, res) => {
       console.log(`[Delete User Flow] Step 1 Success: Successfully deleted user ${uid} from Firebase Auth`);
       authDeleted = true;
     } catch (error: any) {
-      console.error(`[Delete User Flow] Step 1 Error: Error deleting user ${uid} from auth:`, error);
-      if (error.code === 'auth/user-not-found') {
-        console.log(`[Delete User Flow] Step 1 Note: User ${uid} not found in Auth, treating as deleted.`);
+      const errCode = error?.code || '';
+      const errMsg = error?.message || '';
+      
+      if (errCode === 'auth/user-not-found' || errMsg.includes('user-not-found')) {
+        console.warn(`[Delete User Flow] Step 1 Note: User ${uid} not found in Firebase Auth (auth/user-not-found). Proceeding with Firestore cleanup.`);
         authDeleted = true;
-      } else if (error.message && error.message.includes('Identity Toolkit API has not been used')) {
-        authErrorMsg = 'Missing Firebase Service Account. Configure FIREBASE_SERVICE_ACCOUNT_KEY to delete from Auth.';
       } else {
-        authErrorMsg = error.message;
+        console.error(`[Delete User Flow] Step 1 Error: Error deleting user ${uid} from auth:`, error);
+        if (errMsg.includes('Identity Toolkit API has not been used')) {
+          authErrorMsg = 'Missing Firebase Service Account. Configure FIREBASE_SERVICE_ACCOUNT_KEY to delete from Auth.';
+        } else {
+          authErrorMsg = errMsg;
+        }
       }
     }
 
