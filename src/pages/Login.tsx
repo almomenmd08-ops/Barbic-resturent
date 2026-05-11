@@ -13,6 +13,7 @@ import { db } from '../firebase';
 import toast from 'react-hot-toast';
 import { User, Mail, Phone as PhoneIcon, Lock, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { API_BASE } from '../utils/api';
 
 export function Login() {
   const [user, loading] = useAuthState(auth);
@@ -99,7 +100,7 @@ export function Login() {
     try {
       const cleanPhone = phone.replace(/\D/g, '').slice(-10);
       
-      const response = await fetch('/api/send-otp', {
+      const response = await fetch(`${API_BASE}/api/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: cleanPhone })
@@ -195,7 +196,7 @@ export function Login() {
       let otpValid = false;
 
       try {
-        const response = await fetch('/api/verify-otp', {
+        const response = await fetch(`${API_BASE}/api/verify-otp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone: cleanPhone, otp })

@@ -131,7 +131,27 @@ setInterval(async () => {
     console.error('Error during auto-delete task:', error);
   }
 }, 30000); // Check every 30 seconds
-app.use(cors());
+
+// ── CORS configuration ──
+const ALLOWED_ORIGINS = [
+  'https://ai-studio-applet-webapp-eec12.web.app',
+  'http://localhost:3000',
+  'http://localhost:5173'
+];
+
+app.use(cors({
+  origin: ALLOWED_ORIGINS,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+// Ensure Vary: Origin is set so CDNs/proxies don't cache a single origin's response
+app.use((_req, res, next) => {
+  res.setHeader('Vary', 'Origin');
+  next();
+});
+
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
@@ -272,13 +292,12 @@ Values in nutritionData must sum to exactly 100. Make the colors look profession
     let response;
     let retries = 3;
     let delay = 1000;
-    
-    if (!process.env.GEMINI_API_KEY && !process.env.CUSTOM_GEMINI_API_KEY) {
+        if (!process.env.GEMINI_API_KEY && !process.env.CUSTOM_GEMINI_API_KEY) {
        console.error("No API Key present in environment variables.");
-       return res.status(500).json({ error: "No API Key" });
-    } else {
+       return res.status(500).json({ error: "AI service not configured", detail: "The server has no AI API key configured. Please contact the restaurant admin." });
+     } else {
        console.log(`API Key is present. Using: ${process.env.CUSTOM_GEMINI_API_KEY ? 'CUSTOM_GEMINI_API_KEY' : 'GEMINI_API_KEY'}...`);
-    }
+     }
 
     const customKey = process.env.CUSTOM_GEMINI_API_KEY || '';
     const isOpenRouter = customKey.startsWith('sk-or-');
@@ -321,7 +340,8 @@ Values in nutritionData must sum to exactly 100. Make the colors look profession
       }
       
       if (!parsedData.nutritionData) {
-        return res.status(500).json({ error: "OpenRouter API failed" });
+        const errDetail = lastError?.message || 'All retry attempts exhausted';
+        return res.status(502).json({ error: "AI service unavailable", detail: `OpenRouter API failed: ${errDetail}. Please try again in a moment.` });
       }
 
     } else {
@@ -375,11 +395,12 @@ Values in nutritionData must sum to exactly 100. Make the colors look profession
       }
   
       if (!response) {
+        const errDetail = lastError?.message || 'Unknown error';
         // Send 429 rate limit specifically if all models failed with 429
         if (lastError && (lastError.status === 429 || lastError.message?.includes('429'))) {
-           return res.status(429).json({ error: "Rate limit exceeded on all models" });
+           return res.status(429).json({ error: "AI rate limit exceeded", detail: "All AI models are currently rate-limited. Please wait a minute and try again." });
         }
-        return res.status(500).json({ error: "Gemini API failed on all fallback models" });
+        return res.status(502).json({ error: "AI service unavailable", detail: `Gemini API failed on all fallback models: ${errDetail}. Please try again later.` });
       }
 
       if (response?.text) {
@@ -390,7 +411,7 @@ Values in nutritionData must sum to exactly 100. Make the colors look profession
           parsedData = JSON.parse(cleanText);
         } catch (e) {
           console.error("Failed to parse Gemini JSON:", response.text);
-          return res.status(500).json({ error: "Parse error" });
+          return res.status(502).json({ error: "AI response invalid", detail: "The AI returned an unparseable response. Please try again." });
         }
       }
     }
@@ -406,7 +427,8 @@ Values in nutritionData must sum to exactly 100. Make the colors look profession
     
     res.json(parsedData);
   } catch (error: any) {
-    res.status(500).json({ error: "Server error" });
+    console.error('Unhandled error in /api/food-benefits:', error);
+    res.status(500).json({ error: "Server error", detail: error.message || "An unexpected error occurred while generating food benefits. Please try again." });
   }
 });
 

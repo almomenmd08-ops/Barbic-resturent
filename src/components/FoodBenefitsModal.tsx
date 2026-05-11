@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Globe2, Activity, Zap, CheckCircle2 } from 'lucide-react';
+import { X, Globe2, Activity, Zap, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { MenuItem } from '../data/menuData';
 import { fallbackTranslations } from './translations';
 import { OptimizedImage } from './OptimizedImage';
+import { API_BASE } from '../utils/api';
 
 const languages = [
   'English', 'Hindi', 'Bengali', 'Arabic', 'French', 'Spanish', 'Urdu'
@@ -71,6 +72,7 @@ export const FoodBenefitsModal: React.FC<FoodBenefitsModalProps> = ({ isOpen, on
   const [benefitsData, setBenefitsData] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -92,7 +94,7 @@ export const FoodBenefitsModal: React.FC<FoodBenefitsModalProps> = ({ isOpen, on
         setErrorMsg('');
         
         try {
-          const response = await fetch('/api/food-benefits', {
+          const response = await fetch(`${API_BASE}/api/food-benefits`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -105,47 +107,34 @@ export const FoodBenefitsModal: React.FC<FoodBenefitsModalProps> = ({ isOpen, on
               description: item.description || ''
             })
           });
+
           const data = await response.json();
           
           if (!isMounted) return;
           
-          if (response.status === 429 || !response.ok) {
-            // If we get rate limited or API fails, use fallback data instead of showing an error
-            const fallbackData = generateFallbackBenefits(item, language);
-            setBenefitsData(fallbackData);
-            // Do not cache fallback data so we can retry the AI when it's fixed
-            if (isMounted) {
-              setLoading(false);
-            }
+          if (!response.ok) {
+            // Surface the server error to the user instead of silently showing fallback data
+            const serverMessage = data?.detail || data?.error || `Server returned ${response.status}`;
+            setErrorMsg(serverMessage);
+            setLoading(false);
             return;
           }
 
-          if (response.ok && data.nutritionData && data.benefitsText) {
+          if (data.nutritionData && data.benefitsText) {
             setBenefitsData(data);
             globalBenefitsCache[cacheKey] = data;
           } else {
-            // Fallback gracefully on API failure specific to item
-            const fbText = generateFallbackBenefits(item, language);
-            const fallbackData = {
-              nutritionData: generateFallbackNutrition(item, language),
-              benefitsText: fbText.benefitsText,
-              summary: fbText.summary
-            };
-            setBenefitsData(fallbackData);
-            // Do not cache fallback data so we can retry the AI when it's fixed
-            // globalBenefitsCache[cacheKey] = fallbackData;
+            setErrorMsg('The AI returned an incomplete response. Please try again.');
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("Benefits fetch error:", error);
           if (!isMounted) return;
-          const fbText = generateFallbackBenefits(item, language);
-          const fallbackData = {
-            nutritionData: generateFallbackNutrition(item, language),
-            benefitsText: fbText.benefitsText,
-            summary: fbText.summary
-          };
-          setBenefitsData(fallbackData);
-          // Do not cache fallback data so we can retry the AI when it's fixed
+          // Network / CORS errors surface here
+          setErrorMsg(
+            error.message?.includes('Failed to fetch')
+              ? 'Unable to reach the server. Please check your connection and try again.'
+              : `Unexpected error: ${error.message || 'Unknown error'}`
+          );
         } finally {
           if (isMounted) {
             setLoading(false);
@@ -162,7 +151,7 @@ export const FoodBenefitsModal: React.FC<FoodBenefitsModalProps> = ({ isOpen, on
       isMounted = false;
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, item, language]);
+  }, [isOpen, item, language, retryCount]);
 
   if (!isOpen) return null;
 
@@ -226,7 +215,17 @@ export const FoodBenefitsModal: React.FC<FoodBenefitsModalProps> = ({ isOpen, on
                 </div>
               </div>
             ) : errorMsg ? (
-              <div className="p-5 text-red-500 text-sm">{errorMsg}</div>
+              <div className="p-5 flex flex-col items-center gap-3 text-center">
+                <AlertTriangle className="w-8 h-8 text-red-400" />
+                <p className="text-sm font-semibold text-red-600">Unable to load benefits</p>
+                <p className="text-xs text-red-500/80 leading-relaxed max-w-xs">{errorMsg}</p>
+                <button
+                  onClick={() => { setErrorMsg(''); setBenefitsData(null); setRetryCount(c => c + 1); }}
+                  className="mt-2 px-4 py-2 text-xs font-bold rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors"
+                >
+                  Retry
+                </button>
+              </div>
             ) : benefitsData ? (
               <div className="p-5 flex flex-col gap-6">
                 

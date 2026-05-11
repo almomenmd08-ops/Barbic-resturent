@@ -8,6 +8,7 @@ import { getConsistentRandoms } from '../../utils/ratingUtils';
 import { menuData as initialMenuData } from '../../data/menuData';
 import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
 import imageCompression from 'browser-image-compression';
+import { API_BASE } from '../../utils/api';
 
 export function MenuManagement() {
   const [menuItems, setMenuItems] = useState<any[]>([]);
@@ -103,7 +104,7 @@ export function MenuManagement() {
       const extractImage = async () => {
         setIsExtracting(true);
         try {
-          const response = await fetch('/api/extract-image', {
+          const response = await fetch(`${API_BASE}/api/extract-image`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url })

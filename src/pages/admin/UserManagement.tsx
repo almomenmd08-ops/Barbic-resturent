@@ -4,6 +4,7 @@ import { db } from '../../firebase';
 import { Users, Search, ShoppingBag, Trash2, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { DeleteConfirmationModal } from '../../components/DeleteConfirmationModal';
+import { API_BASE } from '../../utils/api';
 
 export function UserManagement() {
   const [users, setUsers] = useState<any[]>([]);
@@ -112,7 +113,7 @@ export function UserManagement() {
     setIsDeleting(true);
     try {
       // 1. Delete from Firebase Authentication via backend API
-      const response = await fetch(`/api/admin/delete-user/${userToDelete}`, {
+      const response = await fetch(`${API_BASE}/api/admin/delete-user/${userToDelete}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' }
       });
