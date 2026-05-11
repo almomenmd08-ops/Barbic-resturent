@@ -120,7 +120,8 @@ export function UserManagement() {
       const data = await response.json().catch(() => null);
       
       if (!response.ok) {
-        throw new Error(data?.error || 'Failed to delete user');
+        const errorMsg = data?.details ? `${data.error}: ${data.details}` : (data?.error || 'Failed to delete user');
+        throw new Error(errorMsg);
       }
 
       if (response.status === 207 && data?.warning) {

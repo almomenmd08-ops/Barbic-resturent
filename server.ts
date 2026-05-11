@@ -434,7 +434,9 @@ Values in nutritionData must sum to exactly 100. Make the colors look profession
 
 app.delete('/api/admin/users/:uid', async (req, res) => {
   const { uid } = req.params;
+  console.log(`[Delete User Flow] Starting deletion process for UID: ${uid}`);
   if (!uid) {
+    console.log(`[Delete User Flow] Aborting: UID is required`);
     return res.status(400).json({ error: 'User UID is required' });
   }
 
@@ -443,13 +445,15 @@ app.delete('/api/admin/users/:uid', async (req, res) => {
     let authErrorMsg = '';
     
     // 1. Delete from Firebase Auth
+    console.log(`[Delete User Flow] Step 1: Attempting to delete from Firebase Auth...`);
     try {
       await getAuth().deleteUser(uid);
-      console.log(`Successfully deleted user ${uid} from Firebase Auth`);
+      console.log(`[Delete User Flow] Step 1 Success: Successfully deleted user ${uid} from Firebase Auth`);
       authDeleted = true;
     } catch (error: any) {
-      console.error(`Error deleting user ${uid} from auth:`, error);
+      console.error(`[Delete User Flow] Step 1 Error: Error deleting user ${uid} from auth:`, error);
       if (error.code === 'auth/user-not-found') {
+        console.log(`[Delete User Flow] Step 1 Note: User ${uid} not found in Auth, treating as deleted.`);
         authDeleted = true;
       } else if (error.message && error.message.includes('Identity Toolkit API has not been used')) {
         authErrorMsg = 'Missing Firebase Service Account. Configure FIREBASE_SERVICE_ACCOUNT_KEY to delete from Auth.';
@@ -459,24 +463,31 @@ app.delete('/api/admin/users/:uid', async (req, res) => {
     }
 
     // 2. Delete user's profile from users collection
+    console.log(`[Delete User Flow] Step 2: Deleting user profile from 'users' collection...`);
     await db.collection('users').doc(uid).delete();
-    console.log(`Successfully deleted user profile for ${uid}`);
+    console.log(`[Delete User Flow] Step 2 Success: Successfully deleted user profile for ${uid}`);
 
     // 3. Find and delete all documents in orders, carts, and reviews where userId matches deleted UID
+    console.log(`[Delete User Flow] Step 3: Cleaning up associated documents across collections...`);
     const collectionsToClean = ['orders', 'carts', 'reviews', 'cartItems'];
     for (const collectionName of collectionsToClean) {
+      console.log(`[Delete User Flow] Step 3 - Collection: ${collectionName} - Querying documents for userId: ${uid}`);
       const snapshot = await db.collection(collectionName).where('userId', '==', uid).get();
       if (!snapshot.empty) {
+        console.log(`[Delete User Flow] Step 3 - Collection: ${collectionName} - Found ${snapshot.size} documents to delete. Deleting in batch...`);
         const batch = db.batch();
         snapshot.docs.forEach(doc => {
           batch.delete(doc.ref);
         });
         await batch.commit();
-        console.log(`Deleted ${snapshot.size} documents from ${collectionName} for user ${uid}`);
+        console.log(`[Delete User Flow] Step 3 - Collection: ${collectionName} - Successfully deleted ${snapshot.size} documents.`);
+      } else {
+        console.log(`[Delete User Flow] Step 3 - Collection: ${collectionName} - No documents found to delete.`);
       }
     }
 
     if (!authDeleted && authErrorMsg) {
+       console.warn(`[Delete User Flow] Completed with warning: Auth deletion failed. Warning: ${authErrorMsg}`);
        return res.status(207).json({ 
          success: true, 
          message: 'User database records deleted, but Auth deletion failed.',
@@ -484,9 +495,10 @@ app.delete('/api/admin/users/:uid', async (req, res) => {
        });
     }
 
+    console.log(`[Delete User Flow] Success: User ${uid} deleted permanently across the entire system.`);
     res.json({ success: true, message: 'User deleted permanently across the entire system' });
   } catch (error: any) {
-    console.error(`Error completely deleting user ${uid}:`, error);
+    console.error(`[Delete User Flow] Fatal Error: Error completely deleting user ${uid}:`, error);
     res.status(500).json({ error: 'Failed to complete user deletion', details: error.message });
   }
 });
