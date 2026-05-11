@@ -180,10 +180,21 @@ app.post('/api/send-otp', async (req, res) => {
 
     res.json({ success: true, message: 'OTP sent successfully' });
   } catch (error: any) {
-    console.error("Fast2SMS Error:", error.response?.data || error.message);
-    otpStore.delete(phone);
-    const errorMessage = error.response?.data?.message || error.message || 'Failed to send OTP via Fast2SMS';
-    res.status(400).json({ error: errorMessage });
+    // ── FALLBACK: API failed → switch to mock OTP so user is never blocked ──
+    const reason = error.response?.data?.message || error.message || 'Unknown error';
+    console.warn(`[OTP FALLBACK] Fast2SMS failed for ${phone}: ${reason}`);
+    console.warn(`[OTP FALLBACK] Switching to mock OTP mode. OTP for ${phone} is now: 123456`);
+
+    // Replace the real OTP with the well-known mock OTP
+    const mockOtp = '123456';
+    otpStore.set(phone, { otp: mockOtp, expiresAt });
+
+    res.json({
+      success: true,
+      message: 'SMS service is temporarily unavailable. Use default OTP: 123456',
+      isMock: true,
+      fallbackReason: reason
+    });
   }
 });
 
