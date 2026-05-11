@@ -461,6 +461,98 @@ app.delete('/api/admin/delete-user/:uid', async (req, res) => {
   }
 });
 
+// ── Cart API (server-side Firestore via Admin SDK) ──────────────────────
+// These endpoints use the Firebase Service Account Key to access Firestore
+// securely. The client sends its Firebase ID token in the Authorization header.
+
+// Helper: verify Firebase ID token from Authorization header
+async function verifyAuthToken(req: express.Request): Promise<string> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new Error('UNAUTHENTICATED');
+  }
+  const idToken = authHeader.split('Bearer ')[1];
+  const decoded = await getAuth().verifyIdToken(idToken);
+  return decoded.uid;
+}
+
+// GET /api/cart – Fetch the authenticated user's cart from Firestore
+app.get('/api/cart', async (req, res) => {
+  try {
+    const uid = await verifyAuthToken(req);
+    const cartDoc = await db.collection('carts').doc(uid).get();
+
+    if (!cartDoc.exists) {
+      return res.json({ items: [], status: 'empty' });
+    }
+
+    const data = cartDoc.data()!;
+    res.json({
+      items: data.items || [],
+      status: data.status || 'active',
+      updatedAt: data.updatedAt || null,
+    });
+  } catch (error: any) {
+    if (error.message === 'UNAUTHENTICATED') {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    console.error('GET /api/cart error:', error);
+    res.status(500).json({ error: 'Failed to fetch cart', detail: error.message });
+  }
+});
+
+// PUT /api/cart – Save/update the authenticated user's cart in Firestore
+app.put('/api/cart', async (req, res) => {
+  try {
+    const uid = await verifyAuthToken(req);
+    const { items } = req.body;
+
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: 'items must be an array' });
+    }
+
+    // Validate each item has required fields
+    for (const item of items) {
+      if (!item.id || !item.name || typeof item.price !== 'number' || typeof item.quantity !== 'number') {
+        return res.status(400).json({ error: 'Each item must have id, name, price, and quantity' });
+      }
+    }
+
+    const cartRef = db.collection('carts').doc(uid);
+
+    // Get user details from the users collection for denormalization
+    let userName = 'User';
+    let userEmail = '';
+    try {
+      const userDoc = await db.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        const userData = userDoc.data()!;
+        userName = userData.name || userName;
+        userEmail = userData.email || userEmail;
+      }
+    } catch (e) {
+      // Non-critical, proceed with defaults
+    }
+
+    await cartRef.set({
+      userId: uid,
+      userName,
+      userEmail,
+      items,
+      status: items.length === 0 ? 'updated' : 'active',
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+
+    res.json({ success: true, message: 'Cart saved' });
+  } catch (error: any) {
+    if (error.message === 'UNAUTHENTICATED') {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    console.error('PUT /api/cart error:', error);
+    res.status(500).json({ error: 'Failed to save cart', detail: error.message });
+  }
+});
+
 async function startServer() {
   const distPath = path.join(process.cwd(), 'dist');
   let isProd = process.env.NODE_ENV === 'production';
