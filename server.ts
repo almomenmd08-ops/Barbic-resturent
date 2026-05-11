@@ -432,32 +432,62 @@ Values in nutritionData must sum to exactly 100. Make the colors look profession
   }
 });
 
-app.delete('/api/admin/delete-user/:uid', async (req, res) => {
+app.delete('/api/admin/users/:uid', async (req, res) => {
   const { uid } = req.params;
   if (!uid) {
     return res.status(400).json({ error: 'User UID is required' });
   }
 
   try {
-    // Delete from Firebase Auth
-    await getAuth().deleteUser(uid);
-    console.log(`Successfully deleted user ${uid} from Firebase Auth`);
-    res.json({ success: true, message: 'User deleted from Authentication' });
-  } catch (error: any) {
-    console.error(`Error deleting user ${uid} from auth:`, error);
-    // If user is already deleted or doesn't exist, we can still return 200 so the client can proceed
-    if (error.code === 'auth/user-not-found') {
-      return res.json({ success: true, message: 'User not found in Auth, considered deleted' });
-    }
-    // Catch when Service Account Key is missing, rendering IAM forbidden over Auth API calls
-    if (error.message && error.message.includes('Identity Toolkit API has not been used')) {
-      return res.status(500).json({ 
-        error: 'Missing Firebase Service Account.', 
-        details: 'To delete users from Firebase Auth within AI Studio, you MUST configure your Firebase Admin credentials. Go to Firebase Console -> Project Settings -> Service Accounts -> Generate New Private Key. Copy the entire JSON and add it to your Environment Variables setting as "FIREBASE_SERVICE_ACCOUNT_KEY".' 
-      });
+    let authDeleted = false;
+    let authErrorMsg = '';
+    
+    // 1. Delete from Firebase Auth
+    try {
+      await getAuth().deleteUser(uid);
+      console.log(`Successfully deleted user ${uid} from Firebase Auth`);
+      authDeleted = true;
+    } catch (error: any) {
+      console.error(`Error deleting user ${uid} from auth:`, error);
+      if (error.code === 'auth/user-not-found') {
+        authDeleted = true;
+      } else if (error.message && error.message.includes('Identity Toolkit API has not been used')) {
+        authErrorMsg = 'Missing Firebase Service Account. Configure FIREBASE_SERVICE_ACCOUNT_KEY to delete from Auth.';
+      } else {
+        authErrorMsg = error.message;
+      }
     }
 
-    res.status(500).json({ error: 'Failed to delete user from Authentication', details: error.message });
+    // 2. Delete user's profile from users collection
+    await db.collection('users').doc(uid).delete();
+    console.log(`Successfully deleted user profile for ${uid}`);
+
+    // 3. Find and delete all documents in orders, carts, and reviews where userId matches deleted UID
+    const collectionsToClean = ['orders', 'carts', 'reviews', 'cartItems'];
+    for (const collectionName of collectionsToClean) {
+      const snapshot = await db.collection(collectionName).where('userId', '==', uid).get();
+      if (!snapshot.empty) {
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+        console.log(`Deleted ${snapshot.size} documents from ${collectionName} for user ${uid}`);
+      }
+    }
+
+    if (!authDeleted && authErrorMsg) {
+       return res.status(207).json({ 
+         success: true, 
+         message: 'User database records deleted, but Auth deletion failed.',
+         warning: authErrorMsg
+       });
+    }
+
+    res.json({ success: true, message: 'User deleted permanently across the entire system' });
+  } catch (error: any) {
+    console.error(`Error completely deleting user ${uid}:`, error);
+    res.status(500).json({ error: 'Failed to complete user deletion', details: error.message });
   }
 });
 

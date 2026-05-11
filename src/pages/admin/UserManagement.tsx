@@ -112,34 +112,28 @@ export function UserManagement() {
     
     setIsDeleting(true);
     try {
-      // 1. Delete from Firebase Authentication via backend API
-      const response = await fetch(`${API_BASE}/api/admin/delete-user/${userToDelete}`, {
+      const response = await fetch(`${API_BASE}/api/admin/users/${userToDelete}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' }
       });
       
+      const data = await response.json().catch(() => null);
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        // Special case: If we fail because of credentials on auth deletion, proceed with DB deletion so the admin isn't fully blocked
-        if (errorData?.details?.includes('Generate New Private Key')) {
-          console.warn("Could not delete from Auth due to missing FIREBASE_SERVICE_ACCOUNT_KEY. Proceeding to delete from Firestore.");
-          toast.success("User deleted from Firestore. (Warning: Could not delete from Auth. Configure Service Account Key in settings.)", { duration: 6000 });
-        } else {
-           throw new Error(errorData?.error || 'Failed to delete user from Auth');
-        }
+        throw new Error(data?.error || 'Failed to delete user');
       }
 
-      // 2. Delete from Firestore
-      await deleteDoc(doc(db, 'users', userToDelete));
-      
-      if (response.ok) {
-        toast.success('User deleted successfully');
+      if (response.status === 207 && data?.warning) {
+        console.warn(data.warning);
+        toast.success("User data deleted. (Warning: Auth deletion failed, check settings.)", { duration: 6000 });
+      } else {
+        toast.success('User and all associated data permanently deleted');
       }
       
       setUsers((prev) => prev.filter(u => u.uid !== userToDelete));
     } catch (error: any) {
       console.error("Error deleting user:", error);
-      toast.error('Delete failed');
+      toast.error(error.message || 'Delete failed');
     } finally {
       setIsDeleting(false);
       setUserToDelete(null);
@@ -275,7 +269,7 @@ export function UserManagement() {
         onClose={() => setDeleteModalOpen(false)}
         onConfirm={confirmDelete}
         title="Delete User"
-        message="Are you sure you want to delete this item?"
+        message="Are you sure you want to permanently delete this user and all associated data (orders, carts, reviews)? This action cannot be undone."
         isDeleting={isDeleting}
       />
     </div>
