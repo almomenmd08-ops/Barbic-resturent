@@ -15,6 +15,8 @@ export function CartManagement() {
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isCleaning, setIsCleaning] = useState(false);
+  const [showOrphaned, setShowOrphaned] = useState(false);
 
   // Update current time every 10 seconds to auto-hide NEW labels
   useEffect(() => {
@@ -40,6 +42,43 @@ export function CartManagement() {
       toast.error('Refresh failed');
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleCleanup = async () => {
+    if (isCleaning) return;
+    
+    if (!window.confirm('This will permanently delete all cart items for users that no longer exist in the system. Continue?')) {
+      return;
+    }
+    
+    setIsCleaning(true);
+    try {
+      let deletedCount = 0;
+      
+      const cartItemsSnap = await getDocs(query(collection(db, 'cartItems')));
+      for (const docSnap of cartItemsSnap.docs) {
+        const data = docSnap.data();
+        if (!data.userId || !usersCache[data.userId]) {
+          await deleteDoc(doc(db, 'cartItems', docSnap.id));
+          deletedCount++;
+        }
+      }
+      
+      const cartsSnap = await getDocs(query(collection(db, 'carts')));
+      for (const docSnap of cartsSnap.docs) {
+        if (!docSnap.id || !usersCache[docSnap.id]) {
+          await deleteDoc(doc(db, 'carts', docSnap.id));
+        }
+      }
+      
+      toast.success(`Cleaned up ${deletedCount} orphaned cart items`);
+      setRefreshKey(prev => prev + 1); // trigger a refresh
+    } catch (err) {
+      console.error("Cleanup failed:", err);
+      toast.error('Cleanup failed');
+    } finally {
+      setIsCleaning(false);
     }
   };
 
@@ -177,9 +216,11 @@ export function CartManagement() {
   }
 
   const filteredCarts = groupedCarts.filter(group => {
-    const user = group.userId ? usersCache[group.userId] : null;
-    const email = user?.email || group.userEmail;
-    return group.userId && group.userId !== 'undefined' && group.userId !== 'null' && email && email !== 'undefined' && email !== 'null';
+    const userExists = group.userId && usersCache[group.userId];
+    if (showOrphaned) {
+      return true; // show everything if toggle is on
+    }
+    return userExists;
   });
 
   return (
@@ -189,14 +230,36 @@ export function CartManagement() {
           <ShoppingCart className="w-6 h-6 mr-2 text-primary-500" />
           Customer Cart Activity
         </h2>
-        <button 
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="flex items-center text-sm px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-          {isRefreshing ? 'Refreshing...' : 'Refresh'}
-        </button>
+        <div className="flex space-x-3">
+          <button 
+            onClick={handleCleanup}
+            disabled={isCleaning}
+            className="flex items-center text-sm px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-md shadow-sm hover:bg-red-100 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+          >
+            <Trash2 className={`w-4 h-4 mr-2 ${isCleaning ? 'animate-pulse' : ''}`} />
+            {isCleaning ? 'Cleaning...' : 'Cleanup Orphaned'}
+          </button>
+          <button 
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="flex items-center text-sm px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <label className="flex items-center space-x-2 cursor-pointer">
+          <input 
+            type="checkbox" 
+            checked={showOrphaned} 
+            onChange={(e) => setShowOrphaned(e.target.checked)}
+            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          />
+          <span className="text-sm text-gray-700 font-medium">Show orphaned carts (users that no longer exist)</span>
+        </label>
       </div>
 
       <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
@@ -243,8 +306,15 @@ export function CartManagement() {
                   <tr key={group.userId}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
-                        <div className="text-sm font-medium text-gray-900">{user?.name || group.userName || 'Guest'}</div>
-                        {isNewUser && (
+                        <div className="text-sm font-medium text-gray-900">
+                          {user ? (user.name || 'Unnamed User') : (group.userName || 'Guest / Unknown')}
+                        </div>
+                        {!user && (
+                           <span className="px-2 inline-flex text-xs leading-5 font-bold rounded bg-red-100 text-red-800 border border-red-200">
+                             ORPHANED
+                           </span>
+                        )}
+                        {isNewUser && user && (
                           <span className="px-2 inline-flex text-xs leading-5 font-bold rounded bg-green-100 text-green-800 border border-green-200">
                             NEW USER
                           </span>
