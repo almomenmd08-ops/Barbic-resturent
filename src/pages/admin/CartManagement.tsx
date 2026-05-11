@@ -176,6 +176,12 @@ export function CartManagement() {
     );
   }
 
+  const filteredCarts = groupedCarts.filter(group => {
+    const user = group.userId ? usersCache[group.userId] : null;
+    const email = user?.email || group.userEmail;
+    return group.userId && group.userId !== 'undefined' && group.userId !== 'null' && email && email !== 'undefined' && email !== 'null';
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -204,7 +210,7 @@ export function CartManagement() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {groupedCarts.map((group) => {
+              {filteredCarts.map((group) => {
                 const user = group.userId ? usersCache[group.userId] : null;
                 const email = user?.email || group.userEmail;
                 const phone = user?.phone || 'N/A';
@@ -293,7 +299,7 @@ export function CartManagement() {
                   </tr>
                 );
               })}
-              {groupedCarts.length === 0 && (
+              {filteredCarts.length === 0 && (
                 <tr>
                   <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">
                     No cart activity found

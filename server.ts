@@ -534,6 +534,7 @@ app.put('/api/cart', async (req, res) => {
       // Non-critical, proceed with defaults
     }
 
+    // 1. Save the main cart document
     await cartRef.set({
       userId: uid,
       userName,
@@ -542,6 +543,62 @@ app.put('/api/cart', async (req, res) => {
       status: items.length === 0 ? 'updated' : 'active',
       updatedAt: new Date().toISOString(),
     }, { merge: true });
+
+    // 2. Sync individual cartItems collection for admin visibility
+    try {
+      const cartItemsRef = db.collection('cartItems');
+      const activeItemsQuery = await cartItemsRef
+        .where('userId', '==', uid)
+        .where('status', '==', 'active')
+        .get();
+
+      const activeDbMap = new Map<string, { docId: string; quantity: number }>();
+      activeItemsQuery.docs.forEach((doc) => {
+        activeDbMap.set(doc.data().itemName, { docId: doc.id, quantity: doc.data().quantity });
+      });
+
+      const currentLocalMap = new Map(items.map((i: any) => [i.name, i]));
+
+      // Mark removed items
+      for (const [itemName, dbItem] of activeDbMap.entries()) {
+        if (!currentLocalMap.has(itemName)) {
+          await cartItemsRef.doc(dbItem.docId).update({
+            status: 'removed',
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      // Add / update items
+      for (const item of items) {
+        const payload = {
+          userId: uid,
+          userName,
+          userEmail,
+          itemName: item.name,
+          quantity: item.quantity,
+          status: 'active',
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (activeDbMap.has(item.name)) {
+          const dbItem = activeDbMap.get(item.name)!;
+          if (dbItem.quantity !== item.quantity) {
+            await cartItemsRef.doc(dbItem.docId).update({
+              quantity: item.quantity,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } else {
+          await cartItemsRef.add({
+            ...payload,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+    } catch (cartItemsError) {
+      console.error('PUT /api/cart error syncing cartItems:', cartItemsError);
+    }
 
     res.json({ success: true, message: 'Cart saved' });
   } catch (error: any) {

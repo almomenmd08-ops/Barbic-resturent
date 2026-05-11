@@ -126,16 +126,19 @@ service cloud.firestore {
       allow delete: if isAdmin() || isOwner(resource.data.userId);
     }
 
+    // Cart logic updated for Render Backend and User Sub-collection
+    match /users/{userId}/cart/{document=**} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
     match /carts/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) || isAdmin();
+      allow read, write: if isOwner(userId) || isAdmin();
     }
 
     match /cartItems/{itemId} {
-      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isAdmin());
-      allow create: if isAuthenticated() && (isOwner(request.resource.data.userId) || isAdmin());
-      allow update: if isAuthenticated() && ((isOwner(resource.data.userId) && request.resource.data.userId == resource.data.userId) || isAdmin());
-      allow delete: if isAdmin();
+      allow read: if isAuthenticated() && (resource.data.userEmail == request.auth.token.email || resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (resource.data.userEmail == request.auth.token.email || isAdmin());
     }
 
     match /users/{userId}/favorites/{favId} {
