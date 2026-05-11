@@ -1,0 +1,209 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-display: "Georgia", serif;
+
+  --color-primary-100: #ffedd5;
+  --color-primary-500: #FF6B00;
+  --color-primary-600: #E85D00;
+  --color-accent-100: #fee2e2;
+  --color-accent-500: #E53935;
+  --color-accent-600: #C62828;
+  --color-gold-500: #FFD700;
+  --color-bg-main: #FFF8F0;
+  --color-bg-section-1: #FFF1E6;
+  --color-bg-section-2: #FFE8D6;
+  --color-text-main: #1F1F1F;
+  --color-text-muted: #666666;
+  --color-wa: #25D366;
+
+  --animate-blob: blob 7s infinite;
+  --animate-shimmer: shimmer 2s linear infinite;
+}
+
+@layer base {
+  html, body {
+    margin: 0;
+    padding: 0;
+    @apply bg-[#111] text-text-main font-sans;
+    min-height: 100vh;
+  }
+  #root {
+    margin: 0;
+    padding: 0;
+    @apply text-text-main font-sans;
+    min-height: 100vh;
+  }
+  
+  .footer, .last-section {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+  .last-section {
+    min-height: auto;
+  }
+  
+  .video-bg {
+    position: fixed;
+    inset: 0;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display text-text-main;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+}
+
+@layer components {
+  /* Base for all premium buttons */
+  .btn-base {
+    @apply relative overflow-hidden inline-flex items-center justify-center font-bold tracking-wide
+           transition-all duration-300 ease-out rounded-full focus:outline-none
+           hover:-translate-y-[2px] active:scale-95 active:translate-y-0 px-6 py-3;
+  }
+
+  .btn-base::after,
+  .btn-primary::after,
+  .btn-whatsapp::after,
+  .btn-call::after,
+  .btn-benefits::after,
+  .btn-directions::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent;
+  }
+  
+  .btn-base:hover::after,
+  .btn-primary:hover::after,
+  .btn-whatsapp:hover::after,
+  .btn-call:hover::after,
+  .btn-benefits:hover::after,
+  .btn-directions:hover::after {
+    @apply animate-[shimmer_1.5s_infinite];
+  }
+
+  /* Primary Order Button - Gradient Orange/Red */
+  .btn-primary {
+    @apply relative overflow-hidden inline-flex items-center justify-center font-bold tracking-wide
+           transition-all duration-300 ease-out rounded-full focus:outline-none
+           hover:-translate-y-[2px] active:scale-95 active:translate-y-0 px-6 py-3
+           text-white bg-gradient-to-r from-[#FF7A00] to-[#FF4D4D] shadow-[0_8px_20px_rgba(255,122,0,0.25)] hover:shadow-[0_12px_25px_rgba(255,122,0,0.35)] border-none;
+  }
+  
+  /* WhatsApp Premium */
+  .btn-whatsapp {
+    @apply relative overflow-hidden inline-flex items-center justify-center font-bold tracking-wide
+           transition-all duration-300 ease-out rounded-full focus:outline-none
+           hover:-translate-y-[2px] active:scale-95 active:translate-y-0 px-6 py-3
+           text-white bg-gradient-to-r from-[#25D366] to-[#1EBE5D] shadow-[0_8px_20px_rgba(37,211,102,0.25)] hover:shadow-[0_12px_25px_rgba(37,211,102,0.35)] border-none;
+  }
+
+  /* Deep Call Button */
+  .btn-call {
+    @apply relative overflow-hidden inline-flex items-center justify-center font-bold tracking-wide
+           transition-all duration-300 ease-out rounded-full focus:outline-none
+           hover:-translate-y-[2px] active:scale-95 active:translate-y-0 px-6 py-3
+           text-white bg-gradient-to-r from-[#E53935] to-[#D32F2F] shadow-[0_8px_20px_rgba(229,57,53,0.25)] hover:shadow-[0_12px_25px_rgba(229,57,53,0.35)] border-none;
+  }
+
+  /* Benefits Luxury Saffron */
+  .btn-benefits {
+    @apply relative overflow-hidden inline-flex items-center justify-center font-bold tracking-wide
+           transition-all duration-300 ease-out rounded-full focus:outline-none
+           hover:-translate-y-[2px] active:scale-95 active:translate-y-0 px-6 py-3
+           text-white bg-gradient-to-r from-[#FFB300] to-[#FF8F00] shadow-[0_8px_20px_rgba(255,179,0,0.25)] hover:shadow-[0_12px_25px_rgba(255,179,0,0.35)] border-none;
+  }
+
+  /* Directions Amber */
+  .btn-directions {
+    @apply relative overflow-hidden inline-flex items-center justify-center font-bold tracking-wide
+           transition-all duration-300 ease-out rounded-full focus:outline-none
+           hover:-translate-y-[2px] active:scale-95 active:translate-y-0 px-6 py-3
+           text-white bg-gradient-to-r from-[#FF9800] to-[#F57C00] shadow-[0_8px_20px_rgba(255,152,0,0.25)] hover:shadow-[0_12px_25px_rgba(255,152,0,0.35)] border-none;
+  }
+
+  /* View All / Dark Luxury */
+  .btn-view-all {
+    @apply relative overflow-hidden inline-flex items-center justify-center font-bold tracking-wide
+           transition-all duration-300 ease-out rounded-full focus:outline-none
+           hover:-translate-y-[2px] active:scale-95 active:translate-y-0 px-6 py-3
+           text-orange-50 bg-[#1A1A1A] border-2 border-[#FF7A00]/40 hover:border-[#FF7A00] shadow-[0_0_15px_rgba(255,122,0,0.15)] hover:shadow-[0_0_25px_rgba(255,122,0,0.3)];
+  }
+  .btn-view-all::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-[#FF7A00]/20 to-transparent;
+  }
+  .btn-view-all:hover::after {
+    @apply animate-[shimmer_1.5s_infinite];
+  }
+
+  /* Secondary */
+  .btn-secondary {
+    @apply relative overflow-hidden inline-flex items-center justify-center font-bold tracking-wide
+           transition-all duration-300 ease-out rounded-[18px] focus:outline-none
+           hover:-translate-y-[2px] active:scale-95 active:translate-y-0 px-6 py-3
+           bg-white text-[#FF4D4D] border-2 border-[#FF4D4D]/20 hover:border-[#FF4D4D]/40 hover:bg-[#FF4D4D]/5 shadow-[0_4px_12px_rgba(255,122,0,0.08)] hover:shadow-[0_8px_16px_rgba(255,122,0,0.15)];
+  }
+  .btn-secondary::after {
+    display: none;
+  }
+  
+  /* Menu Category Pill (replaces old btn-premium usage on menu page) */
+  .btn-pill {
+    @apply relative overflow-hidden inline-flex items-center justify-center font-bold tracking-wide
+           transition-all duration-300 ease-out focus:outline-none
+           hover:-translate-y-[2px] active:scale-95 active:translate-y-0 px-6 py-3
+           rounded-full shadow-sm hover:shadow-md border;
+  }
+}
+
+@layer utilities {
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+  .animation-delay-4000 {
+    animation-delay: 4s;
+  }
+}
+
+@keyframes blob {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+@keyframes icon-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes icon-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.9); opacity: 0.8; }
+}
+
+@keyframes star-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@layer utilities {
+  .animate-star-pop {
+    animation: star-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+}
